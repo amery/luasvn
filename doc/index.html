@@ -1,0 +1,356 @@
+<html>
+<head>
+<title>LuaSVN</title>
+</head>
+<body bgcolor="white">
+
+<h1>LuaSVN - Using Subversion from Lua</h1>
+<hr>
+
+<h3>
+<a href="#Introduction">Introduction</a>
+<br>
+<a href="#Basic_Operation">Basic Operation</a>
+<br>
+<a href="#API">API</a>
+<br>
+<a href="#Getting_LuaSVN">Getting LuaSVN</a>
+<br>
+<a href="#Building_LuaSVN">Building LuaSVN</a>
+<br>
+<a href="#Contact_and_Further_Information">Contact and Further Information</a>
+<br>
+<a href="#License">License</a>
+</h3>
+
+<hr>
+
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p align="justify">
+<i>LuaSVN</i> is a library that allows to use some Subversion (SVN) facilities inside Lua programs.
+</p>
+
+<p align="justify">
+<a href="http://subversion.tigris.org/">Subversion</a> is an open source version control system that has becoming very popular, currently it is
+the version control system used in more than half of the open source projects according <a href="http://cia.vc/stats/vcs">
+Cia.vc</a>.
+</p>
+
+
+<p align="justify">
+Subversion is used not only in source code versioning, but also in web pages versioning, in fact, this
+was the original motivation to develop LuaSVN.
+</p>
+
+<p align="justify">
+LuaSVN was developed using the C API offered by Subversion and implements a basic set of functions which can be
+used in a Lua program.
+</p>
+
+
+<h2><a name="Basic_Operation">Basic Operation</a></h2>
+
+<p align="justify">
+Subversion uses some functionalities from <i>Apache Portable Runtime</i> (APR) project, because APR offers a
+standard interface to underlying platform-specific implementations, so Subversion does not need to worry about
+some lower level questions.
+</p>
+
+
+<p align="justify">
+Because of this, the memory handling is done by a <i>pool</i> from APR library, which by turn is passed as an argument
+to functions of the Subversion's C API. This said, a basic task of the LuaSVN's functions is to initialize the memory
+pool (currently each function has its own pool, there is no global pool), what can be done through a call to the
+function <b>init_pool</b>, which does a set of tasks related to the starting of the memory handling system.
+</p>
+
+<p align="justify">
+After starting the <i>pool</i>, the next step is to get a pointer to the file system under some revision number, this
+can be done calling the <b>init_fs_root</b> function.
+</p>
+
+
+<p align="justify">
+The code related to the specific behavior of a function only starts after the two previous stages have been
+completed.
+</p>
+
+
+<h2><a name="API">API</a></h2>
+
+
+<p align="justify">
+Every LuaSVN function expects as its first argument a string <i>repos</i> indicating the path of a Subversion
+repository that should be accessed. In the current version (0.1), only paths to local repositories are accepted
+and a path should not include the final slash (/). The repository path can be an absolute path or a relative one.
+Often a LuaSVN function also has an integer optional parameter <i>revision</i> indicating the number of the version
+which should be considered, if its value is not specified, or if it is equal to zero, it is assumed that the desired
+version is the youngest one.
+</p>
+
+<p align="justify">
+The standard behavior of a LuaSVN function when a error occurs is to call <i>lua_error</i>.
+</p>
+
+
+<p align="justify">
+The first thing you should do, so you can use LuaSVN, is to import the library, this can done including <code>require ("luasvn")</code>
+in your Lua program. The functions below are in the version 0.1 of the LuaSVN API: 
+</p>
+
+<ul>
+
+<li><code><b>luasvn.change_file (path, file, content)</b></code>
+
+<p align="justify">
+Changes the content of the file indicated by <i>file</i>, in the repository <i>path</i>, to the text <i>content</i>.
+Returns the repository's new version number.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.change_file ("/home/name/myrepos", "trunk/test.txt", "new text\n")</code>
+</p>
+
+
+<li><code><b>luasvn.change_rev_prop (path, prop, value [, revision])</b></code>
+
+<p align="justify">
+Changes the value of the property indicated by string <i>prop</i> to <i>value</i>. Returns
+<code>true</code> in case of success. If the a property named <i>prop</i> does not exist, it
+will be created. On the other hand, if <code>value</code> is equal to <code>nil</code> the
+property will be removed.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>ok = luasvn.change_rev_prop ("../myrepos", "author", "teleco", 12)</code>
+</p>
+
+
+
+<li><code><b>luasvn.create_dir (path, dir)</b></code>
+
+<p align="justify">
+Creates a directory named <i>dir</i> in the repository indicated by <i>path</i>. Returns
+the repository's new version number.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.create_dir ("myrepos", "newDir")</code>
+</p>
+
+
+<li><code><b>create_file (path, file)</b></code>
+
+<p align="justify">
+Creates a file named <i>file</i> in the repository indicated by <i>path</i>. Returns the
+repository's new version number.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.create_file ("/home/name/myrepos", "newFile")</code>
+</p>
+
+
+<li><code><b>create_repos (path)</b></code>
+
+<p align="justify">
+Creates a repository whose path is <i>path</i>. If the repository already exists, it will
+occur an error.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>luasvn.create_repos ("test")</code>
+</p>
+
+
+
+<li><code><b>delete_repos (path)</b></code>
+
+<p align="justify">
+Deletes a repository whose path is <i>path</i>. If the repository does not exist, it will
+occur an error.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>luasvn.delete_repos ("/home/name/test")</code>
+</p>
+
+
+
+
+
+<li><code><b>luasvn.file_exists (path, file [, revision])</b></code>
+
+<p align="justify">
+Checks if a file named <i>file</i> exists in the repository <i>path</i>. In the case of a successful execution,
+the return value is a boolean indicating if the file existes or not.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>exists = luasvn.file_exists ("/home/name/myrepos", "file", 15)</code>
+</p>
+
+
+
+<li><code><b>luasvn.get_file_content (path, file [, revision])</b></code>
+
+<p align="justify">
+Returns the content of <i>file</i> in case of success. If the file has just been created, its
+content should be equal to <code>""</code>.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<pre>
+content = luasvn.get_file_content ("/home/name/myrepos", "file")
+
+print ("File content:", content)
+</pre>
+</p>
+
+
+
+<li><code><b>luasvn.get_file_history (path, file [, revision])</b></code>
+
+<p align="justify">
+In case of success, returns a list indexed by the revision numbers in which the file was
+modified. Each revision number is associated with the name of <i>file</i> in that revision.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.get_file_history ("/home/name/myrepos", "trunk/old.txt", 22)
+
+for rev, name in pairs (t) do
+    print (rev, name)
+end
+</pre>
+</p>
+
+
+<li><code><b>luasvn.get_files (path, dir [, revision])</b></code>
+
+<p align="justify">
+The return value, in case of success, is a table whose keys are the names of the files in directory <i>dir</i>.
+Each file name is associated with a version number indicating the last time that file was modified.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.get_files ("/home/name/myrepos", "") --"" is the root directory
+
+for name, rev in pairs (t) do
+    print (name, rev)
+end
+</pre>
+</p>
+
+
+<li><code><b>luasvn.get_rev_proplist (path, [, revision])</b></code>
+
+<p align="justify">
+Returns a table whose keys are the name of the properties. The correspondent value is
+associated with each property.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.get_rev_proplist ("myrepos", 55)
+
+for prop, v in pairs (t) do
+    print (prop, v)
+end
+</pre>
+</p>
+
+
+</ul>
+
+
+
+<h2><a name="Getting_LuaSVN">Getting LuaSVN</a></h2>
+
+<p align="justify">
+Click <a href="http://luaforge.net/frs/?group_id=289">here</a> to download LuaSVN from LuaForge.
+</p>
+
+<p align="justify">
+You can also get LuaSVN typing the following command line:
+<br><br>
+<code>svn checkout http://luasvn.googlecode.com/svn/trunk/ luasvn</code>
+</p>
+
+
+<h2><a name="Building_LuaSVN">Building LuaSVN</a></h2>
+
+<p align="justify">
+LuaSVN needs development versions of Subversion, APR and uuid. On Ubuntu, if you have the right permissions, you can install
+them in the following way:
+<pre>
+sudo apt-get install libsvn-dev
+sudo apt-get install libuuid1
+</pre>
+</p>
+
+<p align="justify">
+Now you need to edit the makefile to reflect the places where Subversion and APR are installed. After this, you can type
+<i>make</i> and copy <i>luasvn.so</i> to a place where your Lua installation can find it, a typical one is:
+<i>/usr/local/lib/lua/5.1/</i>.
+</p>
+
+<p align="justify">
+If you can not install LuaSVN this way, please take a look at <a href="http://www.freewisdom.org/projects/sputnik/Building_LuaSVN">
+http://www.freewisdom.org/projects/sputnik/Building_LuaSVN</a> or feel free to <a href="#Contact">ask</a>.
+</p>
+
+
+<h2><a name="Contact_and_Further_Information">Contact and Further Information</a></h2>
+
+<p align="justify">
+LuaSVN was developed by S&eacute;rgio Medeiros and is free software.
+If you have any comments or doubts, please send me an e-mail (smedeiros at inf dot puc-rio dot br).
+</p>
+
+
+<h2><a name="License">License</a></h2>
+
+<p align="justify">
+Copyright &copy; 2007 S&eacute;rgio Medeiros.
+</p>
+
+
+<p align="justify">
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+</p>
+
+<p align="justify">
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+</p>
+
+<p align="justify">
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. 
+</p>
+
+
+</body>
+</html>
