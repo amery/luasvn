@@ -45,7 +45,8 @@ was the original motivation to develop LuaSVN.
 
 <p align="justify">
 LuaSVN was developed using the C API offered by Subversion and implements a basic set of functions which can be
-used in a Lua program.
+used in a Lua program. The functions available in LuaSVN are similar to the functions offered by the
+<b>svn</b> tool, but not all <b>svn</b> functions were implemented.
 </p>
 
 
@@ -54,26 +55,14 @@ used in a Lua program.
 <p align="justify">
 Subversion uses some functionalities from <i>Apache Portable Runtime</i> (APR) project, because APR offers a
 standard interface to underlying platform-specific implementations, so Subversion does not need to worry about
-some lower level questions.
+some lower level questions. Because of this, the memory handling is done by a <i>pool</i> from APR library, 
+which by turn is passed as an argument to functions of the Subversion's C API.
 </p>
 
 
 <p align="justify">
-Because of this, the memory handling is done by a <i>pool</i> from APR library, which by turn is passed as an argument
-to functions of the Subversion's C API. This said, a basic task of the LuaSVN's functions is to initialize the memory
-pool (currently each function has its own pool, there is no global pool), what can be done through a call to the
-function <b>init_pool</b>, which does a set of tasks related to the starting of the memory handling system.
-</p>
-
-<p align="justify">
-After starting the <i>pool</i>, the next step is to get a pointer to the file system under some revision number, this
-can be done calling the <b>init_fs_root</b> function.
-</p>
-
-
-<p align="justify">
-The code related to the specific behavior of a function only starts after the two previous stages have been
-completed.
+The function <i>init_function</i> does the job to set up the initial configuration. The code
+related to the specific behavior of a function then comes after.
 </p>
 
 
@@ -81,208 +70,492 @@ completed.
 
 
 <p align="justify">
-Every LuaSVN function expects as its first argument a string <i>repos</i> indicating the path of a Subversion
-repository that should be accessed. In the current version (0.1), only paths to local repositories are accepted
-and a path should not include the final slash (/). The repository path can be an absolute path or a relative one.
-Often a LuaSVN function also has an integer optional parameter <i>revision</i> indicating the number of the version
-which should be considered, if its value is not specified, or if it is equal to zero, it is assumed that the desired
-version is the youngest one.
+This version of LuaSVN works with URLs (e.g., "file:///", "http://", etc) and with paths
+(e.g., "wc/", "/home/name/workingcopy", etc). It also handles correctly the extra slash in
+the end of an URL or a path.
 </p>
 
 <p align="justify">
-The standard behavior of a LuaSVN function when a error occurs is to call <i>lua_error</i>.
+Often a LuaSVN function also has an integer optional parameter <i>revision</i> indicating
+the number of the version which should be considered. If this value is not specified, or if
+it is <b>nil</b>, then a default value will be supplied. Most of the time this value will be
+the youngest version of the repository, in case of an URL, and the base working copy, in case
+of a path.
 </p>
 
+<p align="justify">
+The standard behavior of a LuaSVN function when an error occurs is to call <i>lua_error</i>.
+</p>
 
 <p align="justify">
-The first thing you should do, so you can use LuaSVN, is to import the library, this can done including <code>require ("luasvn")</code>
-in your Lua program. The functions below are in the version 0.1 of the LuaSVN API: 
+The first thing you should do, so you can use LuaSVN, is to import the library. This can
+be done including <code>require ("luasvn")</code> in your Lua program. The functions below
+are in the version 0.2 of the LuaSVN API: 
 </p>
 
 <ul>
 
-<li><code><b>luasvn.change_file (path, file, content)</b></code>
+<li><code><b>luasvn.add (path)</b></code>
 
 <p align="justify">
-Changes the content of the file indicated by <i>file</i>, in the repository <i>path</i>, to the text <i>content</i>.
-Returns the repository's new version number.
+Schedules the working copy <i>path</i> for addition to the repository. It does not return anything.
 </p>
 
 <p align="justify">Example:
 <br>
-<code>rev = luasvn.change_file ("/home/name/myrepos", "trunk/test.txt", "new text\n")</code>
+<code>luasvn.add ("file_or_dir")
 </p>
 
 
-<li><code><b>luasvn.change_rev_prop (path, prop, value [, revision])</b></code>
+<li><code><b>luasvn.cat (path_or_url [, revision])</b></code>
 
 <p align="justify">
-Changes the value of the property indicated by string <i>prop</i> to <i>value</i>. Returns
-<code>true</code> in case of success. If the a property named <i>prop</i> does not exist, it
-will be created. On the other hand, if <code>value</code> is equal to <code>nil</code> the
-property will be removed.
+Gets the content of a file identified by <i>path_or_url</i>. If <i>revision</i> is not
+supplied or if it is <b>nil</b>, then the most recent version will be considered.
 </p>
 
 <p align="justify">Example:
 <br>
-<code>ok = luasvn.change_rev_prop ("../myrepos", "author", "teleco", 12)</code>
+<code>content = luasvn.cat ("http://luasvn.googlecode.com/svn/trunk/0.2/luasvn.c")
 </p>
 
 
-
-<li><code><b>luasvn.create_dir (path, dir)</b></code>
+<li><code><b>luasvn.checkout (url, dir [, revision])</b></code>
 
 <p align="justify">
-Creates a directory named <i>dir</i> in the repository indicated by <i>path</i>. Returns
-the repository's new version number.
+Gets a working copy of <i>url</i>, at <i>revision</i>, putting the new working copy
+in directory <i>dir</i>. If <i>revision</i> is not supplied or if it is <b>nil</b>,
+then the most recent version will be considered. Returns the number of the revision
+actually checked out from the repository.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.checkout ("http://luasvn.googlecode.com/svn/trunk/0.2/", "luasvn/")
+</p>
+
+
+<li><code><b>luasvn.cleanup (dir)</b></code>
+
+<p align="justify">
+Implements the Subversion function <i>svn_client_cleanup</i>, that
+recursively cleans up a working copy directory <i>dir</i>, finishing
+any incomplete operations, removing lockfiles, etc. It does not
+return anything.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>luasvn.cleanup ("mydir")
+</p>
+
+
+<li><code><b>luasvn.commit ()</b></code>
+
+<p align="justify">
+Commits files or directories into repository. Returns the number of the new revision
+of the repository.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.commit ()
+</p>
+
+
+<li><code><b>luasvn.copy (src_path, dest_path [, revision])</b></code>
+
+<p align="justify">
+Copies <i>src_path</i> to <i>dest_path</i>, a non-existent working copy path
+or repository. If <i>src_path</i> is an URL, <i>revision</i> indicates which version
+should be copied. If <i>revision</i> is not supplied or if it is <b>nil</b>,
+then the most recent version will be considered. Returns the number of the revision
+in <i>dest_path</i> if a commit was performed or <b>nil</b> otherwise.
 </p>
 
 
 <p align="justify">Example:
 <br>
-<code>rev = luasvn.create_dir ("myrepos", "newDir")</code>
+<code>rev = luasvn.copy ("file.c", "file:///home/sergio/newrepos/copy.c")
 </p>
 
 
-<li><code><b>create_file (path, file)</b></code>
+<li><code><b>luasvn.delete (path_or_url)</b></code>
 
 <p align="justify">
-Creates a file named <i>file</i> in the repository indicated by <i>path</i>. Returns the
-repository's new version number.
+Deletes the file <i>path_or_url</i>. If a commit is performed, then retuns
+the new version of the repository, otherwise returns <b>nil</b>.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.delete ("file:///home/sergio/myrepos/foo.c")
+</p>
+
+
+<li><code><b>luasvn.diff (path1, rev1 [,path2 [,rev2 [,outfile [,errfile]]]])</b></code>
+
+<p align="justify">
+Performs a diff operation between <i>path1</i> and <i>path2</i>, which can
+be either working-copy paths or URLs. If <i>path2</i> is not supplied, then
+it is assumed to be equal to <i>path1</i>. If <i>rev1</i> is <b>nil</b>, its
+default value is the youngest version of the repository, if <i>path1</i> is an URL,
+and the base revision of the working copy otherwise. If <i>rev2</i> is <b>nil</b>,
+its defaule value is the youngest version of the repository, if <i>path2</i> is
+an URL, and the current state of the working copy otherwise.
+</p>
+
+<p align="justify">
+If <i>outfile</i> is absent or is equal to <b>nil</b>, then <i>stdout</i>
+will be considered. In the same way, <i>stderr</i> will be considered
+if <i>errfile</i> is not supplied of if it is <b>nil</b>. This function
+does not return anything.
+</p>
+
+
+<p align="justify">Examples:
+<br>
+<code>luasvn.diff ("file:///home/sergio/myrepos/foo.c", 11)</code>
+<br>
+<code>luasvn.diff ("wc", nil)</code>
+<br>
+<code>luasvn.diff ("http://luasvn.googlecode.com/svn/trunk/0.2/luasvn.c", 20, nil, nil, "out.txt", "err.txt")</code>
+</p>
+
+
+<li><code><b>luasvn.import (path, url)</b></code>
+
+<p align="justify">
+Imports file or directory <i>path</i> into repository <i>url</i>. Returns
+the version of the repository.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.import ("mydir", "file:///home/sergio/myrepos/")</code>
+</p>
+
+
+<li><code><b>luasvn.list (path_or_url [, revision])</b></code>
+
+<p align="justify">
+Lists the directory entry indicated by <i>path_or_url</i>. Returns a table
+where a key is an entry and the associated value is always true. If
+<i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered if <i>path_or_url</i> is an URL, otherwise
+the base working copy will be considered.
+</p>
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.list ("file:///home/sergio/myrepos/")
+
+for i, v in pairs (t) do
+    print (i)
+end
+</pre>
+</p>
+
+
+<li><code><b>luasvn.log (path_or_url [, revision])</b></code>
+
+<p align="justify">
+Lists the directory entry indicated by <i>path_or_url</i>. Returns a table
+where a key is the number of a revision in which <i>path_or_url</i> was
+modified.
+</p>
+
+<p align="justify">
+The value associated with a key is also a table. This table has three fields:
+<i>date</i>, indicating when that revision was commited; <i>author</i>, the
+author of the modification; and <i>message</i>, the log message associated
+with the revision.
+</p>
+
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered if <i>path_or_url</i> is an URL, otherwise
+the base working copy will be considered.
+</p>
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.log ("wc/foo.c")
+
+for i, v in pairs (t) do
+    print (i, v.author, v.date, v.message)
+end
+</pre>
+</p>
+
+
+<li><code><b>luasvn.merge (path1, rev1, path2, rev2, wcpath)</b></code>
+
+<p align="justify">
+Merge changes from <i>path1</i> at <i>rev1</i> to <i>path2</i> at <i>rev2</i>
+into the working-copy path <i>wcpath</i>.
+</p>
+
+<p align="justify">
+<i>path1</i> and <i>path2</i> are either URLs that refer to entries in the 
+repository, or paths to entries in the working copy. In case of
+<i>rev1</i>/<i>rev2</i> be <b>nil</b>, the default value will be the youngest
+version of the repository if <i>path1</i>/<i>path2</i> is an URL, and
+the base working copy otherwise. This function does not return anything.
 </p>
 
 
 <p align="justify">Example:
 <br>
-<code>rev = luasvn.create_file ("/home/name/myrepos", "newFile")</code>
+<pre>
+luasvn.merge ("file:///tmp/repos1", nil, "file:///tmp/repos2/", 3, "wc")
+</pre>
 </p>
 
 
-<li><code><b>create_repos (path)</b></code>
+<li><code><b>luasvn.mkdir (path)</b></code>
+
+<p align="justify">
+Creates a directory in a repository or in a working copy. Returns the number of the
+new version of the repository, or <b>nil</b> if <i>path</i> is a working copy.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.mkdir ("file:///tmp/repos1/newdir")
+</p>
+
+
+<li><code><b>luasvn.move (src_path, dest_path)</b></code>
+
+<p align="justify">
+Moves <i>src_path</i> to <i>dest_path</i>, a non-existent working copy path
+or repository. <i>src_path</i> must be a file or directory under version
+control, or the URL of a versioned item in the repository.
+</p>
+
+<p align="justify">
+Returns the number of the revision in <i>dest_path</i> if a commit was
+performed or <b>nil</b> otherwise.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>rev = luasvn.move ("file:///home/sergio/repos/foo.c", "file:///home/sergio/repos/fuu.c")
+</p>
+
+
+<li><code><b>luasvn.propget (path, propname [, revision])</b></code>
+
+<p align="justify">
+Returns a table whose keys are the items that have the property <i>propname</i>
+and whose values are the corresponding property value for <i>propname</i>.
+</p>
+
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered if <i>path</i> is an URL, otherwise
+the base working copy will be considered.
+</p>
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.propget ("wc/", "color")
+for i, v in pairs (t) do
+    print (i, v)
+end
+</pre>
+</p>
+
+
+<li><code><b>luasvn.proplist (path, [, revision])</b></code>
+
+<p align="justify">
+Returns a table with the regular properties of <i>path</i>, an URL or working
+copy. The keys of the table are name of the properties and the values are the
+corresponding property value.
+</p>
+
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered if <i>path</i> is an URL, otherwise
+the base working copy will be considered.
+</p>
+
+<p align="justify">Example:
+<br>
+<pre>
+t = luasvn.proplist ("wc/")
+for i, v in pairs (t) do
+    print (i, v)
+end
+</pre>
+</p>
+
+
+<li><code><b>luasvn.propset (path, propname, propval)</b></code>
+
+<p align="justify">
+Sets <i>propname</i> to <i>propval</i> on <i>path</i>. If <i>path</i> is a
+directory, then <i>propname</i> will be set on recursively on <i>path</i>.
+If <i>propval</i> is <b>nil</b> the property will be deleted. This function does
+not return anything and works only on working copies.
+</p>
+
+
+<p align="justify">Example:
+<br>
+<code>luasvn.propset ("/tmp/repos/file.txt", "color", "blue")</code>
+</p>
+
+
+<li><code><b>repos_create (path)</b></code>
 
 <p align="justify">
 Creates a repository whose path is <i>path</i>. If the repository already exists, it will
-occur an error.
+occur an error. This function creates only local repositories and does not return
+anything.
 </p>
 
 
 <p align="justify">Example:
 <br>
-<code>luasvn.create_repos ("test")</code>
+<code>luasvn.repos_create ("myrepos")</code>
 </p>
 
 
 
-<li><code><b>delete_repos (path)</b></code>
+<li><code><b>repos_delete (path)</b></code>
 
 <p align="justify">
 Deletes a repository whose path is <i>path</i>. If the repository does not exist, it will
-occur an error.
+occur an error. This function works only for local repositories and does not return
+anything.
 </p>
 
 
 <p align="justify">Example:
 <br>
-<code>luasvn.delete_repos ("/home/name/test")</code>
+<code>luasvn.repos_delete ("/home/name/myrepos")</code>
 </p>
 
 
-
-
-
-<li><code><b>luasvn.file_exists (path, file [, revision])</b></code>
+<li><code><b>luasvn.revprop_get (url, propname [, revision])</b></code>
 
 <p align="justify">
-Checks if a file named <i>file</i> exists in the repository <i>path</i>. In the case of a successful execution,
-the return value is a boolean indicating if the file existes or not.
+Returns the value associated with property <i>propname</i>. This routine does not
+affect the working copy; it is a pure network operation that queries an
+<b>unversioned</b> property (e.g., <i>svn:date</i>) attached to a revision.
 </p>
-
-
-<p align="justify">Example:
-<br>
-<code>exists = luasvn.file_exists ("/home/name/myrepos", "file", 15)</code>
-</p>
-
-
-
-<li><code><b>luasvn.get_file_content (path, file [, revision])</b></code>
 
 <p align="justify">
-Returns the content of <i>file</i> in case of success. If the file has just been created, its
-content should be equal to <code>""</code>.
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered.
 </p>
-
 
 <p align="justify">Example:
 <br>
 <pre>
-content = luasvn.get_file_content ("/home/name/myrepos", "file")
-
-print ("File content:", content)
+v = luasvn.revprop_get ("http://luasvn.googlecode.com/svn/trunk/0.2/luasvn.c", "svn:date", 21)
 </pre>
 </p>
 
 
-
-<li><code><b>luasvn.get_file_history (path, file [, revision])</b></code>
+<li><code><b>luasvn.revprop_list (url, [, revision])</b></code>
 
 <p align="justify">
-In case of success, returns a list indexed by the revision numbers in which the file was
-modified. Each revision number is associated with the name of <i>file</i> in that revision.
+Returns a table with the revision properties attached to <i>revision</i> in the
+repository represented by <i>url</i>. This function does not read a working
+copy and it only reads <b>unversioned</b> properties (e.g., <i>svn:log</i>)
+attached to a revision.
 </p>
 
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered.
+</p>
 
 <p align="justify">Example:
 <br>
 <pre>
-t = luasvn.get_file_history ("/home/name/myrepos", "trunk/old.txt", 22)
-
-for rev, name in pairs (t) do
-    print (rev, name)
+t = luasvn.revprop_list ("file:///tmp/repos1/")
+for i, v in pairs (t) do
+    print (i, v)
 end
 </pre>
 </p>
 
 
-<li><code><b>luasvn.get_files (path, dir [, revision])</b></code>
+<li><code><b>luasvn.revprop_set (url, propname, propval [, revision])</b></code>
 
 <p align="justify">
-The return value, in case of success, is a table whose keys are the names of the files in directory <i>dir</i>.
-Each file name is associated with a version number indicating the last time that file was modified.
+Sets <i>propname</i> to <i>propval</i> on revision <i>revision</i> in the
+repository represented by <i>url</i>. Returns the number of the revision
+actually affected. Notice that unless the administrator creates a
+pre-revprop-change hook in the repository, this feature will fail.
 </p>
 
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered.
+</p>
+
+<p align="justify">Example:
+<br>
+<code>r = luasvn.revprop_set ("file:///tmp/repos/file.txt", "color", "blue")</code>
+</p>
+
+
+<li><code><b>luasvn.status (path, [, revision])</b></code>
+
+<p align="justify">
+Returns a table with the status of the working copy <i>path</i>. Uses <i>revision</i>
+as the revision number when contacting the repository to get more information. The keys of
+the table are items in <i>path</i> and the associated value of an item is a string
+following the same format of the string returned by a <code>svn status</code> command
+(with the flags <i>update</i> and <i>verbose</i> set).
+</p>
+
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered.
+</p>
 
 <p align="justify">Example:
 <br>
 <pre>
-t = luasvn.get_files ("/home/name/myrepos", "") --"" is the root directory
-
-for name, rev in pairs (t) do
-    print (name, rev)
+t = luasvn.status ("wc")
+for i, v in pairs (t) do
+    print (i, v)
 end
 </pre>
 </p>
 
 
-<li><code><b>luasvn.get_rev_proplist (path, [, revision])</b></code>
+
+
+<li><code><b>luasvn.update (path, [, revision])</b></code>
 
 <p align="justify">
-Returns a table whose keys are the name of the properties. The correspondent value is
-associated with each property.
+Updates the working tree <i>path</i> to <i>revision</i>. Returns the number
+of the revision to which <i>revision</i> was resolved.
 </p>
 
+<p align="justify">
+If <i>revision</i> is not supplied of if it is <b>nil</b>, then the youngest version
+of the repository will be considered.
+</p>
 
 <p align="justify">Example:
 <br>
-<pre>
-t = luasvn.get_rev_proplist ("myrepos", 55)
-
-for prop, v in pairs (t) do
-    print (prop, v)
-end
-</pre>
+<code>r = luasvn.update ("")</code>
+<br>
+<code>r = luasvn.update ("wc/", 12)</code>
 </p>
-
 
 </ul>
 
@@ -291,21 +564,17 @@ end
 <h2><a name="Getting_LuaSVN">Getting LuaSVN</a></h2>
 
 <p align="justify">
-Click <a href="http://luaforge.net/frs/?group_id=289">here</a> to download LuaSVN from LuaForge.
+Click <a href="http://luaforge.net/frs/?group_id=289">here</a> to download LuaSVN
+from LuaForge.
 </p>
 
-<p align="justify">
-You can also get LuaSVN typing the following command line:
-<br><br>
-<code>svn checkout http://luasvn.googlecode.com/svn/trunk/ luasvn</code>
-</p>
 
 
 <h2><a name="Building_LuaSVN">Building LuaSVN</a></h2>
 
 <p align="justify">
-LuaSVN needs development versions of Subversion, APR and uuid. On Ubuntu, if you have the right permissions, you can install
-them in the following way:
+LuaSVN needs development versions of Subversion, APR and uuid. On Ubuntu, if you have
+the right permissions, you can install them in the following way:
 <pre>
 sudo apt-get install libsvn-dev
 sudo apt-get install libuuid1
@@ -313,9 +582,9 @@ sudo apt-get install libuuid1
 </p>
 
 <p align="justify">
-Now you need to edit the makefile to reflect the places where Subversion and APR are installed. After this, you can type
-<i>make</i> and copy <i>luasvn.so</i> to a place where your Lua installation can find it, a typical one is:
-<i>/usr/local/lib/lua/5.1/</i>.
+Now you need to edit the makefile to reflect the places where Subversion and APR are installed. After this,
+you can type <i>make</i> and copy <i>luasvn.so</i> to a place where your Lua installation can find it, a
+typical one is: <i>/usr/local/lib/lua/5.1/</i>.
 </p>
 
 <p align="justify">
@@ -323,12 +592,21 @@ If you can not install LuaSVN this way, please take a look at <a href="http://ww
 http://www.freewisdom.org/projects/sputnik/Building_LuaSVN</a> or feel free to <a href="#Contact">ask</a>.
 </p>
 
+<p align="justify">
+To be able to use the URLs with <i>http</i> protocol, you will also need <i>libneon</i>, this can be a little
+bit complicated, but, in resume, you do not need to worry if you are building LuaSVN using <i>apt-get</i> and
+you should get <i>libneon-0.25.X</i> if you are building LuaSVN by yourself. I will try to put a more
+step-by-step guide if needed.
+</p>
+
 
 <h2><a name="Contact_and_Further_Information">Contact and Further Information</a></h2>
 
 <p align="justify">
 LuaSVN was developed by S&eacute;rgio Medeiros and is free software.
-If you have any comments or doubts, please send me an e-mail (smedeiros at inf dot puc-rio dot br).
+If you have any comments or doubts, please send an e-mail to the
+<a href="http://lists.luaforge.net/mailman/listinfo/luasvn-list">LuaSVN list</a>
+or for me (smedeiros at inf dot puc-rio dot br).
 </p>
 
 
