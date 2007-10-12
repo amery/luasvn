@@ -150,7 +150,7 @@ return anything.
 </p>
 
 
-<li><code><b>luasvn.commit ()</b></code>
+<li><code><b>luasvn.commit ([path [, message])</b></code>
 
 <p align="justify">
 Commits files or directories into repository. Returns the number of the new revision
@@ -160,10 +160,12 @@ of the repository.
 <p align="justify">Example:
 <br>
 <code>rev = luasvn.commit ()
+<br>
+<code>rev = luasvn.commit ("", "a log message")
 </p>
 
 
-<li><code><b>luasvn.copy (src_path, dest_path [, revision])</b></code>
+<li><code><b>luasvn.copy (src_path, dest_path [, revision [, message]])</b></code>
 
 <p align="justify">
 Copies <i>src_path</i> to <i>dest_path</i>, a non-existent working copy path
@@ -180,7 +182,7 @@ in <i>dest_path</i> if a commit was performed or <b>nil</b> otherwise.
 </p>
 
 
-<li><code><b>luasvn.delete (path_or_url)</b></code>
+<li><code><b>luasvn.delete (path_or_url [, message])</b></code>
 
 <p align="justify">
 Deletes the file <i>path_or_url</i>. If a commit is performed, then retuns
@@ -223,7 +225,7 @@ does not return anything.
 </p>
 
 
-<li><code><b>luasvn.import (path, url)</b></code>
+<li><code><b>luasvn.import (path, url [, message])</b></code>
 
 <p align="justify">
 Imports file or directory <i>path</i> into repository <i>url</i>. Returns
@@ -315,7 +317,7 @@ luasvn.merge ("file:///tmp/repos1", nil, "file:///tmp/repos2/", 3, "wc")
 </p>
 
 
-<li><code><b>luasvn.mkdir (path)</b></code>
+<li><code><b>luasvn.mkdir (path [, message])</b></code>
 
 <p align="justify">
 Creates a directory in a repository or in a working copy. Returns the number of the
@@ -328,7 +330,7 @@ new version of the repository, or <b>nil</b> if <i>path</i> is a working copy.
 </p>
 
 
-<li><code><b>luasvn.move (src_path, dest_path)</b></code>
+<li><code><b>luasvn.move (src_path, dest_path [, message])</b></code>
 
 <p align="justify">
 Moves <i>src_path</i> to <i>dest_path</i>, a non-existent working copy path
@@ -538,7 +540,7 @@ end
 
 
 
-<li><code><b>luasvn.update (path, [, revision])</b></code>
+<li><code><b>luasvn.update ([path [, revision]])</b></code>
 
 <p align="justify">
 Updates the working tree <i>path</i> to <i>revision</i>. Returns the number
