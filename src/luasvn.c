@@ -303,7 +303,7 @@ l_checkout (lua_State *L) {
 
 static int
 l_cleanup (lua_State *L) {
-	const char *path = luaL_checkstring (L, 1);
+	const char *path = (lua_gettop (L) < 1 || lua_isnil (L, 1)) ? "" : luaL_checkstring (L, 1);
 
 	apr_pool_t *pool;
 	svn_error_t *err;
@@ -452,7 +452,7 @@ l_delete (lua_State *L) {
 
 static int
 l_diff (lua_State *L) {
-	const char *path1 = luaL_checkstring (L, 1);
+	const char *path1 = (lua_gettop (L) < 1 || lua_isnil (L, 1)) ? "" : luaL_checkstring (L, 1);
 
 	svn_opt_revision_t rev1;
 
@@ -520,7 +520,7 @@ l_diff (lua_State *L) {
 	array = apr_array_make (pool, 0, sizeof (const char *));
 
 	err = svn_client_diff3 (array, path1, &rev1, path2, &rev2,
-			                TRUE, FALSE, FALSE, FALSE,
+			                TRUE, TRUE, FALSE, FALSE,
 							APR_LOCALE_CHARSET, aprout, aprerr,
 							ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
@@ -700,7 +700,7 @@ l_log (lua_State *L) {
 	lua_newtable (L);
 
 	err = svn_client_log3 (array, &peg_revision, &start, &end, limit, 
-					FALSE, TRUE, log_receiver, L, ctx, pool);
+					FALSE, FALSE, log_receiver, L, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	svn_pool_destroy (pool);
@@ -753,7 +753,7 @@ l_merge (lua_State *L) {
 
 
 	err = svn_client_merge2 (source1, &rev1, source2, &rev2, wcpath,
-			TRUE, TRUE, FALSE, FALSE, NULL, ctx, pool);
+			TRUE, FALSE, FALSE, FALSE, NULL, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
 
 
@@ -1201,9 +1201,9 @@ l_revprop_set (lua_State *L) {
 			IF_ERROR_RETURN (err, pool, L);
 		}
 	
-		err = svn_client_revprop_set (propname_utf8, sstring, url, &revision, &rev, TRUE, ctx, pool);
+		err = svn_client_revprop_set (propname_utf8, sstring, url, &revision, &rev, FALSE, ctx, pool);
 	} else {
-		err = svn_client_revprop_set (propname_utf8, NULL, url, &revision, &rev, TRUE, ctx, pool);
+		err = svn_client_revprop_set (propname_utf8, NULL, url, &revision, &rev, FALSE, ctx, pool);
 	}
 	IF_ERROR_RETURN (err, pool, L);
 	
@@ -1393,7 +1393,7 @@ status_func (void *baton, const char *path, svn_wc_status2_t *status) {
 static int
 l_status (lua_State *L) {
 
-	const char *path = luaL_checkstring (L, 1);
+	const char *path = (lua_gettop (L) < 1 || lua_isnil (L, 1)) ? "" : luaL_checkstring (L, 1);
 	
 	svn_opt_revision_t revision;
 
