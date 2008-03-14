@@ -7,6 +7,7 @@
 #include <svn_config.h>
 #include <svn_cmdline.h>
 #include <svn_subst.h>
+#include <svn_time.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -191,6 +192,29 @@ get_revision_kind (const char *path) {
 static int
 l_add (lua_State *L) {
 	const char *path = luaL_checkstring (L, 1);
+	
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t force = FALSE;
+	svn_boolean_t no_ignore = FALSE;
+
+	int itable = 2;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+	
+		lua_getfield (L, itable, "no_ignore");
+		if (lua_isboolean (L, -1)) {
+			no_ignore = lua_toboolean (L, -1);
+		}
+	} 
+	
 
 	apr_pool_t *pool;
 	svn_error_t *err;
@@ -200,7 +224,7 @@ l_add (lua_State *L) {
 
 	path = svn_path_canonicalize (path, pool);
 
-	err = svn_client_add3 (path, TRUE, FALSE, FALSE, ctx, pool);
+	err = svn_client_add3 (path, recursive, force, no_ignore, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	svn_pool_destroy (pool);
@@ -279,6 +303,23 @@ l_checkout (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 3);
 	}
 
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t ignore_externals = FALSE;
+
+	int itable = 4;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "ignore_externals");
+		if (lua_isboolean (L, -1)) {
+			ignore_externals = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -290,7 +331,7 @@ l_checkout (lua_State *L) {
 
 	svn_revnum_t rev;
 
-	err = svn_client_checkout2 (&rev, path, dir, &peg_revision, &revision, TRUE, FALSE, ctx, pool);
+	err = svn_client_checkout2 (&rev, path, dir, &peg_revision, &revision, recursive, ignore_externals, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 	
 	lua_pushinteger (L, rev);
@@ -327,6 +368,24 @@ l_commit (lua_State *L) {
 	const char *path = (lua_gettop (L) < 1 || lua_isnil (L, 1)) ? "" : luaL_checkstring (L, 1);
 	const char *message = (lua_gettop (L) < 2 || lua_isnil (L, 2)) ? "" : luaL_checkstring (L, 2);
 
+
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t keep_locks = FALSE;
+
+	int itable = 3;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "keep_locks");
+		if (lua_isboolean (L, -1)) {
+			keep_locks = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -345,7 +404,7 @@ l_commit (lua_State *L) {
 	
 	ctx->log_msg_func2 = log_msg_func2;
 
-	err = svn_client_commit3 (&commit_info, array, TRUE, FALSE, ctx, pool);
+	err = svn_client_commit3 (&commit_info, array, recursive, keep_locks, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
 
 	if (commit_info == NULL) {
@@ -412,7 +471,17 @@ l_delete (lua_State *L) {
 
 	const char *path = luaL_checkstring (L, 1);
 	const char *message = (lua_gettop (L) < 2 || lua_isnil (L, 2)) ? "" : luaL_checkstring (L, 2);
+
+	svn_boolean_t force = FALSE;
 	
+	int itable = 3;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+	} 
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -434,7 +503,7 @@ l_delete (lua_State *L) {
 		ctx->log_msg_func2 = log_msg_func2;
 	}
 
-	err = svn_client_delete2 (&commit_info, array, FALSE, ctx, pool);
+	err = svn_client_delete2 (&commit_info, array, force, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	if (commit_info == NULL) {
@@ -481,7 +550,36 @@ l_diff (lua_State *L) {
 	const char *outfile = (lua_gettop (L) < 5 || lua_isnil (L, 5)) ? NULL : luaL_checkstring (L, 5);
 	
 	const char *errfile = (lua_gettop (L) < 6 || lua_isnil (L, 6)) ? NULL : luaL_checkstring (L, 6);
+
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t ignore_ancestry = TRUE;
+	svn_boolean_t no_diff_deleted = FALSE;
+	svn_boolean_t force = FALSE;
 	
+	int itable = 7;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "ignore_ancestry");
+		if (lua_isboolean (L, -1)) {
+			ignore_ancestry = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "no_diff_deleted");
+		if (lua_isboolean (L, -1)) {
+			no_diff_deleted = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+	} 
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -520,7 +618,7 @@ l_diff (lua_State *L) {
 	array = apr_array_make (pool, 0, sizeof (const char *));
 
 	err = svn_client_diff3 (array, path1, &rev1, path2, &rev2,
-			                TRUE, TRUE, FALSE, FALSE,
+			                recursive, ignore_ancestry, no_diff_deleted, force,
 							APR_LOCALE_CHARSET, aprout, aprerr,
 							ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
@@ -536,6 +634,24 @@ l_import (lua_State *L) {
 	const char *path = lua_isnil (L, 1) ? "" : luaL_checkstring (L, 1);
 	const char *url = luaL_checkstring (L, 2);
 	const char *message = (lua_gettop (L) < 3 || lua_isnil (L, 3)) ? "" : luaL_checkstring (L, 3);
+	
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t no_ignore = FALSE;
+	
+	int itable = 4;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "no_ignore");
+		if (lua_isboolean (L, -1)) {
+			no_ignore = lua_toboolean (L, -1);
+		}
+	} 
+
 
 	apr_pool_t *pool;
 	svn_error_t *err;
@@ -551,7 +667,7 @@ l_import (lua_State *L) {
 	make_log_msg_baton (&(ctx->log_msg_baton2), message, NULL, ctx->config, pool, L);
 	ctx->log_msg_func2 = log_msg_func2;
 
-	err = svn_client_import2 (&commit_info, path, url, FALSE, FALSE, ctx, pool);
+	err = svn_client_import2 (&commit_info, path, url, !recursive, no_ignore, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	if (commit_info == NULL) {
@@ -585,7 +701,32 @@ list_func (void *baton,
 	} 	
 	
 	lua_pushfstring (L, "%s%s", path, dirent->kind == svn_node_dir ? "/" : "");
+	
+	lua_newtable (L);
+	
+	if (dirent->kind == svn_node_file)
+		lua_pushinteger (L, dirent->size);
+	else
+		lua_pushnil (L);
+
+	lua_setfield (L, -2, "size");
+
+	if (dirent->last_author)
+		lua_pushstring (L, dirent->last_author);
+	else
+		lua_pushnil (L);
+
+	lua_setfield (L, -2, "author");
+
+	
 	lua_pushinteger (L, dirent->created_rev);
+	lua_setfield (L, -2, "revision");
+
+
+	lua_pushstring (L, svn_time_to_human_cstring (dirent->time, pool));
+	lua_setfield (L, -2, "date");
+
+
 	lua_settable (L, -3);
 
 	return SVN_NO_ERROR;
@@ -607,6 +748,23 @@ l_list (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 2);
 	}
 
+	svn_boolean_t recursive = FALSE;
+	svn_boolean_t fetch_locks = FALSE;
+
+	int itable = 3;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "fetch_locks");
+		if (lua_isboolean (L, -1)) {
+			fetch_locks = lua_toboolean (L, -1);
+		}
+	} 
+
+	
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -617,8 +775,8 @@ l_list (lua_State *L) {
 
 	lua_newtable (L);
 
-	err = svn_client_list (path, &peg_revision, &revision, TRUE, SVN_DIRENT_ALL, 
-			               TRUE, list_func, L, ctx, pool);
+	err = svn_client_list (path, &peg_revision, &revision, recursive, SVN_DIRENT_ALL, 
+			               fetch_locks, list_func, L, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	svn_pool_destroy (pool);
@@ -683,6 +841,29 @@ l_log (lua_State *L) {
 		end.value.number = lua_tointeger (L, 3);
 	}
 
+	int limit = 0; 
+	if (lua_gettop (L) >= 4) {
+		limit = lua_tointeger (L, 4);
+	}
+
+	svn_boolean_t discover_changed_paths = FALSE;
+	svn_boolean_t stop_on_copy = FALSE;
+	
+	int itable = 5;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "discover_changed_paths");
+		if (lua_isboolean (L, -1)) {
+			discover_changed_paths = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "stop_on_copy");
+		if (lua_isboolean (L, -1)) {
+			stop_on_copy = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -696,11 +877,10 @@ l_log (lua_State *L) {
 	array = apr_array_make (pool, 1, sizeof (const char *));
 	(*((const char **) apr_array_push (array))) = path;
 
-	const int limit = 0;
 	lua_newtable (L);
 
-	err = svn_client_log3 (array, &peg_revision, &start, &end, limit, 
-					FALSE, FALSE, log_receiver, L, ctx, pool);
+	err = svn_client_log3 (array, &peg_revision, &end, &start, limit, 
+					discover_changed_paths, stop_on_copy, log_receiver, L, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	svn_pool_destroy (pool);
@@ -741,6 +921,36 @@ l_merge (lua_State *L) {
 		wcpath = luaL_checkstring (L, 5);
 	}
 
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t ignore_ancestry = FALSE;
+	svn_boolean_t force = FALSE;
+	svn_boolean_t dry_run = FALSE;
+	
+	int itable = 6;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "ignore_ancestry");
+		if (lua_isboolean (L, -1)) {
+			ignore_ancestry = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "dry_run");
+		if (lua_isboolean (L, -1)) {
+			dry_run = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -753,7 +963,7 @@ l_merge (lua_State *L) {
 
 
 	err = svn_client_merge2 (source1, &rev1, source2, &rev2, wcpath,
-			TRUE, FALSE, FALSE, FALSE, NULL, ctx, pool);
+			recursive, ignore_ancestry, force, dry_run, NULL, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
 
 
@@ -809,6 +1019,18 @@ l_move (lua_State *L) {
 	const char *dest_path = luaL_checkstring (L, 2);
 	const char *message = (lua_gettop (L) < 3 || lua_isnil (L, 3)) ? "" : luaL_checkstring (L, 3);
 
+	svn_boolean_t force = FALSE;
+	
+	int itable = 4;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -825,7 +1047,7 @@ l_move (lua_State *L) {
 		ctx->log_msg_func2 = log_msg_func2;
 	}
 
-	err = svn_client_move4 (&commit_info, src_path, dest_path, FALSE, ctx, pool);
+	err = svn_client_move4 (&commit_info, src_path, dest_path, force, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
 
 	if (commit_info == NULL) {
@@ -848,6 +1070,8 @@ l_propget (lua_State *L) {
 
 	svn_opt_revision_t peg_revision;
 	svn_opt_revision_t revision;
+	
+	peg_revision.kind = svn_opt_revision_unspecified;
 
 	if (lua_gettop (L) < 3 || lua_isnil (L, 3)) {
 		revision.kind = svn_opt_revision_unspecified;
@@ -856,7 +1080,18 @@ l_propget (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 3);
 	}
 
-	peg_revision.kind = svn_opt_revision_unspecified;
+	
+	svn_boolean_t recursive = FALSE;
+	
+	int itable = 4;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+	} 
+
 
 	apr_pool_t *pool;
 	svn_error_t *err;
@@ -872,7 +1107,7 @@ l_propget (lua_State *L) {
 	err = svn_utf_cstring_to_utf8 (&propname_utf8, propname, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
-	err = svn_client_propget2 (&props, propname_utf8, path, &peg_revision, &revision, TRUE, ctx, pool);
+	err = svn_client_propget2 (&props, propname_utf8, path, &peg_revision, &revision, recursive, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	lua_newtable (L);
@@ -904,6 +1139,8 @@ l_proplist (lua_State *L) {
 
 	svn_opt_revision_t peg_revision;
 	svn_opt_revision_t revision;
+	
+	peg_revision.kind = svn_opt_revision_unspecified;
 
 	if (lua_gettop (L) < 2 || lua_isnil (L, 2)) {
 		revision.kind = svn_opt_revision_unspecified;
@@ -912,7 +1149,18 @@ l_proplist (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 2);
 	}	
 
-	peg_revision.kind = svn_opt_revision_unspecified;
+	
+	svn_boolean_t recursive = FALSE;
+	
+	int itable = 3;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+	} 
+
 
 	apr_pool_t *pool;
 	svn_error_t *err;
@@ -926,7 +1174,7 @@ l_proplist (lua_State *L) {
 
 	int is_url = svn_path_is_url (path);
 
-	err = svn_client_proplist2 (&props, path, &peg_revision, &revision, TRUE, ctx, pool);
+	err = svn_client_proplist2 (&props, path, &peg_revision, &revision, recursive, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	lua_newtable (L);
@@ -982,7 +1230,26 @@ l_propset (lua_State *L) {
 	const char *path = luaL_checkstring (L, 1);
 	const char *propname = luaL_checkstring (L, 2);
 	const char *propval = lua_isnil (L, 3) ? NULL : luaL_checkstring (L, 3);
+
 	
+	svn_boolean_t recursive = FALSE;
+	svn_boolean_t force = FALSE;
+	
+	int itable = 4;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -998,9 +1265,9 @@ l_propset (lua_State *L) {
 	if (propval != NULL) {
 		svn_string_t *sstring = svn_string_create (propval, pool);
 
-		err = svn_client_propset2 (propname_utf8, sstring, path, TRUE, FALSE, ctx, pool);
+		err = svn_client_propset2 (propname_utf8, sstring, path, recursive, force, ctx, pool);
 	} else {
-		err = svn_client_propset2 (propname_utf8, NULL, path, TRUE, FALSE, ctx, pool);
+		err = svn_client_propset2 (propname_utf8, NULL, path, recursive, force, ctx, pool);
 	}
 	IF_ERROR_RETURN (err, pool, L);
 	
@@ -1179,6 +1446,19 @@ l_revprop_set (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 4);
 	}
 
+	svn_boolean_t force = FALSE;
+	
+	int itable = 5;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "force");
+		if (lua_isboolean (L, -1)) {
+			force = lua_toboolean (L, -1);
+		}
+	} 
+
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -1201,9 +1481,9 @@ l_revprop_set (lua_State *L) {
 			IF_ERROR_RETURN (err, pool, L);
 		}
 	
-		err = svn_client_revprop_set (propname_utf8, sstring, url, &revision, &rev, FALSE, ctx, pool);
+		err = svn_client_revprop_set (propname_utf8, sstring, url, &revision, &rev, force, ctx, pool);
 	} else {
-		err = svn_client_revprop_set (propname_utf8, NULL, url, &revision, &rev, FALSE, ctx, pool);
+		err = svn_client_revprop_set (propname_utf8, NULL, url, &revision, &rev, force, ctx, pool);
 	}
 	IF_ERROR_RETURN (err, pool, L);
 	
@@ -1216,6 +1496,9 @@ l_revprop_set (lua_State *L) {
 
 typedef struct status_bt {
 	lua_State *L;
+	svn_boolean_t detailed;
+	svn_boolean_t show_last_committed;
+	svn_boolean_t repos_locks;
 	apr_pool_t *pool;
 } status_bt;
 
@@ -1384,9 +1667,12 @@ print_status(const char *path,
 
 static void
 status_func (void *baton, const char *path, svn_wc_status2_t *status) {
+	struct status_bt *sb = baton;
 	apr_pool_t *pool = ((status_bt *)baton)->pool;
+	
 	print_status (svn_path_local_style (path, pool), 
-			      TRUE, TRUE, TRUE, status, ((status_bt *) baton)->L, pool);			
+			      sb->detailed, sb->show_last_committed, sb->repos_locks,
+				  status, ((status_bt *) baton)->L, pool);			
 }
 
 
@@ -1404,6 +1690,42 @@ l_status (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 2);
 	}
 
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t verbose = FALSE;
+	svn_boolean_t show_updates = FALSE;
+	svn_boolean_t no_ignore = FALSE;
+	svn_boolean_t ignore_externals = FALSE;
+	
+	int itable = 3;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "verbose");
+		if (lua_isboolean (L, -1)) {
+			verbose = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "show_updates");
+		if (lua_isboolean (L, -1)) {
+			show_updates = lua_toboolean (L, -1);
+		}
+
+		lua_getfield (L, itable, "no_ignore");
+		if (lua_isboolean (L, -1)) {
+			no_ignore = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "ignore_externals");
+		if (lua_isboolean (L, -1)) {
+			ignore_externals = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -1415,12 +1737,16 @@ l_status (lua_State *L) {
    	svn_revnum_t rev;	
 	status_bt baton;
 	baton.L = L;
+	baton.detailed = (verbose || show_updates);
+	baton.show_last_committed = verbose;
+	baton.repos_locks = show_updates;
 	baton.pool = pool;
+
 
 	lua_newtable (L);
 
 	err = svn_client_status2 (&rev, path, &revision, status_func, &baton, 
-			                  TRUE, TRUE, TRUE, FALSE, FALSE, ctx, pool);
+			                  recursive, verbose, show_updates, no_ignore, ignore_externals, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);
 
 	svn_pool_destroy (pool);
@@ -1443,6 +1769,24 @@ l_update (lua_State *L) {
 		revision.value.number = lua_tointeger (L, 2);
 	}
 
+	svn_boolean_t recursive = TRUE;
+	svn_boolean_t ignore_externals = FALSE;
+	
+	int itable = 3;
+	if (lua_gettop (L) >= itable && lua_istable (L, itable)) {
+		
+		lua_getfield (L, itable, "recursive");
+		if (lua_isboolean (L, -1)) {
+			recursive = lua_toboolean (L, -1);
+		}
+		
+		lua_getfield (L, itable, "ignore_externals");
+		if (lua_isboolean (L, -1)) {
+			ignore_externals = lua_toboolean (L, -1);
+		}
+	} 
+
+
 	apr_pool_t *pool;
 	svn_error_t *err;
 	svn_client_ctx_t *ctx;
@@ -1458,7 +1802,7 @@ l_update (lua_State *L) {
 
 	apr_array_header_t *result_revs = NULL;
 
-	err = svn_client_update2 (&result_revs, array, &revision, TRUE, FALSE, ctx, pool);
+	err = svn_client_update2 (&result_revs, array, &revision, recursive, ignore_externals, ctx, pool);
 	IF_ERROR_RETURN (err, pool, L);	
 
 	if (result_revs == NULL) {
