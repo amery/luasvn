@@ -5,6 +5,7 @@
 <body bgcolor="white">
 
 <h1>LuaSVN - Using Subversion from Lua</h1>
+<font color="white">lua svn lua subversion lua</font>
 <hr>
 
 <h3>
@@ -76,14 +77,30 @@ This is a brief history of LuaSVN:
 
 <ul>
 
-<li><b>0.1.0</b>: First version
-
-<li><b>0.2.0</b>: Released 01 Oct 2007
-
+<li><b>0.4.0</b>: Released 16 Jun 2009
 <ul>
-	<li>Based on the <i>libsvn_client</i> library.
+	<li>LuaSVN now compiles on Windows too! Thanks to Scott Weeks.
+	<li>Error handling improved. Thanks again to Scott Weeks.
+	<li>No changes in the API.
 </ul>
 
+
+<li><b>0.3.0</b>: Released 14 Mar 2008
+<ul>
+	<li>The main change was the addition of a configuration table
+</ul>
+
+
+<li><b>0.2.6</b>: Released 24 Oct 2007
+<ul>
+	<li>all the parameters of <i>cleanup</i>, <i>diff</i> and <i>status</i> are now
+	optional.
+
+	<li>some flags in <i>diff</i>, <i>log</i>, <i>merge</i> and <i>revprop_set</i> 
+	were changed to match the default values of the svn command line tool.
+
+	<li>the <i>makefile</i> was improved.
+</ul>
 
 <li><b>0.2.5</b>: Released 12 Oct 2007
 <ul>
@@ -114,31 +131,15 @@ This is a brief history of LuaSVN:
 	<li>I think some libraries were not necessary during linking, so I removed them
 	from the makefile. I would like to receive some <b>feedback</b> about the
 	<b>installation</b> of LuaSVN.
-
 </ul>
 
-<li><b>0.2.6</b>: Released 24 Oct 2007
+<li><b>0.2.0</b>: Released 01 Oct 2007
+
 <ul>
-	<li>all the parameters of <i>cleanup</i>, <i>diff</i> and <i>status</i> are now
-	optional.
-
-	<li>some flags in <i>diff</i>, <i>log</i>, <i>merge</i> and <i>revprop_set</i> 
-	were changed to match the default values of the svn command line tool.
-
-	<li>the <i>makefile</i> was improved.
-
+	<li>Based on the <i>libsvn_client</i> library.
 </ul>
 
-<li><b>0.3.0</b>: Released 14 Mar 2008
-<ul>
-	<li>The main change was the addition of a configuration table
-</ul>
-
-
-<li><b>Next release</b>: ?
-<ul>
-	<li>Maybe add some more functions to the API.
-</ul>
+<li><b>0.1.0</b>: First version
 
 </ul>
 
@@ -243,7 +244,7 @@ The following fields of <i>config</i> are important for this function:
 <p align="justify">
 Implements the Subversion function <i>svn_client_cleanup</i>, that
 recursively cleans up a working copy directory <i>dir</i>, finishing
-any incomplete operations, removing lockfiles, etc. It does not
+any incomplete operations, removing lock files, etc. It does not
 return anything.
 </p>
 
