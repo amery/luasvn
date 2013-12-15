@@ -8,6 +8,7 @@
 #include <svn_cmdline.h>
 #include <svn_subst.h>
 #include <svn_time.h>
+#include <svn_utf.h>
 
 #include <apr_xlate.h>
 
