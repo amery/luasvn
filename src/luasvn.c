@@ -9,6 +9,8 @@
 #include <svn_subst.h>
 #include <svn_time.h>
 
+#include <apr_xlate.h>
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
